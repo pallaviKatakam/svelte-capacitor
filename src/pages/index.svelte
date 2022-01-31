@@ -1,7 +1,7 @@
 <script>
     // @ts-ignore
     import { Geolocation } from '@capacitor/geolocation';
-    import { BleClient } from '@capacitor-community/bluetooth-le';
+    import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
     import { Device } from '@capacitor/device';
     import { Keyboard } from '@capacitor/keyboard';
     import { StatusBar } from '@capacitor/status-bar';
@@ -10,9 +10,11 @@
     let info = new Object;
     let battery_info = {};
     let src = "";
+    let deviceID = {};
 
     async function getDeviceInfo(){
         info = await Device.getInfo();
+        deviceID = await Device.getId();
     };
 
     getDeviceInfo();
@@ -25,14 +27,25 @@
 
     let Bstatus = null;
     BleClient.initialize();
+
     async function getBluetoothStatus(){
         const res = await BleClient.isEnabled();
         Bstatus = res;
     }
 
     async function connectBluetooth(){
+        await BleClient.initialize();
         const res1 = await BleClient.requestDevice();
-        const res = await BleClient.connect("[9C:19:C2:22:35:18] Redmi Earbud 3 Pro");
+        const isbond = await BleClient.isBonded(res1.deviceId);
+        if(!isbond){
+            await BleClient.createBond(res1.deviceId);
+        }
+        const res = await BleClient.connect(res1.deviceId, (deviceID) => onDisconnect(deviceID), {timeout:1000000000}); 
+        alert(res)
+    }
+
+    function onDisconnect(deviceId){
+        console.log(`device ${deviceId} disconnected`);
     }
 
     async function onBluetooth(){
@@ -63,7 +76,7 @@
             resultType: CameraResultType.Uri
         });
 
-        src = image.path;
+        src = image.webPath;
     };
 
     var name = "svelte"
@@ -76,7 +89,10 @@
 
     {JSON.stringify(info)}
     <br>
+    {JSON.stringify(deviceID)}
+    <br>
     <p>Device Name : {info['name']}</p>
+    <p>Device Id : {deviceID['uuid']}</p>
 
     {JSON.stringify(battery_info)}
 
@@ -126,9 +142,12 @@
         Take picture
     </button>
 
-    <div>
-        <img {src} alt="cam_img" id="camImage"/>
-    </div>
+    {#if src !== ''}
+        <div>
+            {src}
+            <img {src} alt="cam_img" id="camImage"/>
+        </div>
+    {/if}
 </div>
 
 <style>
